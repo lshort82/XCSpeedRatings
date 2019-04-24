@@ -52,7 +52,7 @@ public class AddRace extends Application {
                 String url = e.select(":nth-of-type(1)").select("a").first().attr("abs:href");
                 int runNumber= Integer.parseInt(url.replaceAll("[^0-9]", ""));
                 try {
-                    Statement stmt = Main.conn.createStatement();
+                    Statement stmt = Populate.conn.createStatement();
                     String check = "select rating from harriers where id = " + runNumber;
                     ResultSet rs = stmt.executeQuery(check);
                     double rating = 0;
