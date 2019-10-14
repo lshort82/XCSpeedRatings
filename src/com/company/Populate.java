@@ -1,4 +1,6 @@
 package com.company;
+import java.net.MalformedURLException;
+import java.text.DecimalFormat;
 import java.util.*;
 import org.jsoup.*;
 import org.jsoup.nodes.*;
@@ -12,12 +14,11 @@ public class Populate {
     protected static java.sql.Connection conn;
     static {
         try {
-            conn = DriverManager.getConnection("jdbc:mysql://localhost:3306/com", "root", "Alla_S@cramento");
+            conn = DriverManager.getConnection("jdbc:mysql://harrierdb.cdorakeie0ns.us-east-1.rds.amazonaws.com:3306/Harriers", "lshort82", "V1a_Vancouver");
         } catch (SQLException e) {
             e.printStackTrace();
         }
     }
-
     private static final String mensTeams = "MensTeamUrls";
     private static final String womensTeams = "WomensTeamUrls";
     private static final double mensRecord = 788.4;
@@ -29,12 +30,7 @@ public class Populate {
      * @param args input
      */
     public static void main(String[] args) throws Exception {
-        try {
-            conn = DriverManager.getConnection("jdbc:mysql://localhost:3306/com", "root", "Alla_S@cramento");
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-        populateDB(mensTeams);
+        populateDB(womensTeams);
         //System.out.println(Runner.getRunnerList().toString());
     }
 
@@ -51,7 +47,7 @@ public class Populate {
             e.printStackTrace();
         }
         while (sc.hasNext()) {
-            String url = sc.next();
+            String url = "https://www.tfrrs.org/teams/" + sc.next();
 
             Document doc = null;
             try {
@@ -74,6 +70,15 @@ public class Populate {
                     current = iter.next();
                 }
                 if (roster != null) {
+                    try {
+                        PreparedStatement stmt = conn.prepareStatement("insert into Schools "
+                                + "(name) "
+                                + "values (?)");
+                        stmt.setString(1, school);
+                        stmt.execute();
+                    } catch (SQLException e) {
+                        e.printStackTrace();
+                    }
                     for (Element row : roster.select("tr")) {
                         checkRunner(row, school);
                     }
@@ -96,56 +101,51 @@ public class Populate {
     public static void checkRunner(Element row, String school) {
         String url = row.select(":nth-of-type(1)").select("a").first().attr("abs:href");
         double time = lookFor5k(url);
-        int runNumber= Integer.parseInt(url.replaceAll("[^0-9]", ""));
-        try {
-            Statement stmt = conn.createStatement();
-            String check = "select * from harriers where id = " + runNumber;
-            ResultSet rs = stmt.executeQuery(check);
-            if (!rs.next()) {
-                addRunner(row, runNumber, time, school);
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
+        if (time != 0)
+        addRunner(row, "1", time, school);
     }
 
     /**
      * Adds the runner to the database
      *
      * @param row in the website
-     * @param id unique id
+     * @param gender of the athlete
      * @param time 5k PR, if available
      * @param school of the runner
      */
-    public static void addRunner(Element row, int id, double time, String school) {
+    public static void addRunner(Element row, String gender, double time, String school) {
         String runner = row.select("td:nth-of-type(1)").text();
-        int rating = (int) Math.round(mensRecord / time * 1000);
-        rating = (rating == -1) ? 0 : rating;
+        double rating;
+        if (time == 0) {
+            rating = 0;
+        } else {
+            rating = Math.round((womensRecord / time * 1000.0) * 100.0) / 100.0;
+        }
         String fName;
         String lName;
         String[] splitString;
         if (runner.contains(", ")) {
             splitString = runner.split(", ");
-            fName = splitString[1].replaceAll("[^A-Za-z]", "");
-            lName = splitString[0].replaceAll("[^A-Za-z]", "");
+            fName = splitString[1];
+            lName = splitString[0];
         } else if (runner.contains(",")) {
             splitString = runner.split(",");
-            fName = splitString[1].replaceAll("[^A-Za-z]", "");
-            lName = splitString[0].replaceAll("[^A-Za-z]", "");
+            fName = splitString[1];
+            lName = splitString[0];
         } else {
             splitString = runner.split(" ");
             fName = splitString[0];
             lName = splitString[1];
         }
         try {
-            PreparedStatement stmt = conn.prepareStatement("insert into harriers "
-                    + "(id, firstName, lastName, rating, team) "
+            PreparedStatement stmt = conn.prepareStatement("insert into Runners "
+                    + "(gender, school, first_name, last_name, agg_rating) "
                     + "values (?, ?, ?, ?, ?)");
-            stmt.setInt(1, id);
-            stmt.setString(2, fName);
-            stmt.setString(3, lName);
-            stmt.setInt(4, rating);
-            stmt.setString(5, school);
+            stmt.setString(1, gender);
+            stmt.setString(2, school);
+            stmt.setString(3, fName);
+            stmt.setString(4, lName);
+            stmt.setDouble(5, rating);
             stmt.execute();
         } catch (SQLException e) {
             e.printStackTrace();
